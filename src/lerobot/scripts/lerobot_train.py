@@ -419,7 +419,11 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
         # the learning signal stays spatially consistent.
         # Runs on CPU in worker processes before any device transfer.
         # Set collate_fn=None to disable augmentation.
-        collate_fn=AugmentCollate(max_angle_deg=180.0, max_translate_coord=50.0),
+        collate_fn=(
+            AugmentCollate(max_angle_deg=180.0, max_translate_coord=50.0)
+            if cfg.use_augmentation
+            else None
+        ),
     )
 
     # Prepare everything with accelerator
@@ -558,7 +562,8 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
 
                 # meters/tracker
                 eval_metrics = {
-                    "avg_sum_reward": AverageMeter("∑rwrd", ":.3f"),
+                    "avg_sum_reward": AverageMeter("sum_rwrd", ":.3f"),
+                    "avg_max_reward": AverageMeter("max_rwrd", ":.3f"),  # 新增
                     "pc_success": AverageMeter("success", ":.1f"),
                     "eval_s": AverageMeter("eval_s", ":.3f"),
                 }
@@ -572,9 +577,10 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
                 )
                 eval_tracker.eval_s = aggregated.pop("eval_s")
                 eval_tracker.avg_sum_reward = aggregated.pop("avg_sum_reward")
+                eval_tracker.avg_max_reward = aggregated.pop("avg_max_reward")  # 新增
                 eval_tracker.pc_success = aggregated.pop("pc_success")
                 if wandb_logger:
-                    wandb_log_dict = {**eval_tracker.to_dict(), **eval_info}
+                    wandb_log_dict = eval_tracker.to_dict()
                     wandb_logger.log_dict(wandb_log_dict, step, mode="eval")
                     wandb_logger.log_video(
                         eval_info["overall"]["video_paths"][0], step, mode="eval"

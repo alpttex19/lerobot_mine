@@ -30,6 +30,7 @@ from lerobot.processor import (
     PolicyProcessorPipeline,
 )
 from lerobot.robots import RobotConfig
+from lerobot.envs.wrappers import RandomGoalWrapper
 from lerobot.teleoperators.config import TeleoperatorConfig
 from lerobot.utils.constants import (
     ACTION,
@@ -118,11 +119,16 @@ class EnvConfig(draccus.ChoiceRegistry, abc.ABC):
                 )
 
         def _make_one():
-            return gym.make(
+            env = gym.make(
                 self.gym_id,
                 disable_env_checker=self.disable_env_checker,
                 **self.gym_kwargs,
             )
+            if self.random_goal:
+                from examples.training.eval_policy import RandomGoalWrapper
+
+                env = RandomGoalWrapper(env)
+            return env
 
         extra_kwargs: dict = {}
         if env_cls is gym.vector.AsyncVectorEnv:
@@ -218,6 +224,7 @@ class PushtEnv(EnvConfig):
     episode_length: int = 300
     obs_type: str = "pixels_agent_pos"
     render_mode: str = "rgb_array"
+    random_goal: bool = False  # 随机化目标位置
     visualization_width: int = 384
     visualization_height: int = 384
     observation_height: int = 384
