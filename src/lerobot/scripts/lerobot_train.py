@@ -15,10 +15,15 @@
 # limitations under the License.
 import dataclasses
 import logging
+import sys
 import time
 from contextlib import nullcontext
+from pathlib import Path
 from pprint import pformat
 from typing import Any
+
+# Geometric augmentation for PushT (repo root → pusht_augment.py)
+from lerobot.datasets.pusht_augment import AugmentCollate  # noqa: E402
 
 import torch
 from accelerate import Accelerator
@@ -96,7 +101,9 @@ def update_policy(
     rabc_batch_weights = None
     rabc_batch_stats = None
     if rabc_weights_provider is not None:
-        rabc_batch_weights, rabc_batch_stats = rabc_weights_provider.compute_batch_weights(batch)
+        rabc_batch_weights, rabc_batch_stats = (
+            rabc_weights_provider.compute_batch_weights(batch)
+        )
 
     # Let accelerator handle mixed precision
     with accelerator.autocast():
@@ -108,7 +115,9 @@ def update_policy(
             # Apply RA-BC weights: L_RA-BC = Σ(w_i * l_i) / (Σw_i + ε)
             # rabc_batch_weights is already normalized to sum to batch_size
             epsilon = 1e-6
-            loss = (per_sample_loss * rabc_batch_weights).sum() / (rabc_batch_weights.sum() + epsilon)
+            loss = (per_sample_loss * rabc_batch_weights).sum() / (
+                rabc_batch_weights.sum() + epsilon
+            )
             # Log raw mean weight (before normalization) - this is the meaningful metric
             output_dict["rabc_mean_weight"] = rabc_batch_stats["raw_mean_weight"]
             output_dict["rabc_num_zero_weight"] = rabc_batch_stats["num_zero_weight"]
@@ -202,7 +211,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     else:
         wandb_logger = None
         if is_main_process:
-            logging.info(colored("Logs will be saved locally.", "yellow", attrs=["bold"]))
+            logging.info(
+                colored("Logs will be saved locally.", "yellow", attrs=["bold"])
+            )
 
     if cfg.seed is not None:
         set_seed(cfg.seed, accelerator=accelerator)
@@ -233,7 +244,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     eval_env = None
     if cfg.eval_freq > 0 and cfg.env is not None and is_main_process:
         logging.info("Creating env")
-        eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
+        eval_env = make_env(
+            cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs
+        )
 
     if is_main_process:
         logging.info("Creating policy")
@@ -255,7 +268,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     # Create processors - only provide dataset_stats if not resuming from saved processors
     processor_kwargs = {}
     postprocessor_kwargs = {}
-    if (cfg.policy.pretrained_path and not cfg.resume) or not cfg.policy.pretrained_path:
+    if (
+        cfg.policy.pretrained_path and not cfg.resume
+    ) or not cfg.policy.pretrained_path:
         # Only provide dataset_stats when not resuming from saved processor state
         processor_kwargs["dataset_stats"] = dataset.meta.stats
 
@@ -268,7 +283,10 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
             "device_processor": {"device": device.type},
             "normalizer_processor": {
                 "stats": dataset.meta.stats,
-                "features": {**policy.config.input_features, **policy.config.output_features},
+                "features": {
+                    **policy.config.input_features,
+                    **policy.config.output_features,
+                },
                 "norm_map": policy.config.normalization_mapping,
             },
         }
@@ -307,7 +325,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
         head_mode = getattr(cfg, "rabc_head_mode", "sparse")
         logging.info(f"Loading SARM progress for RA-BC from {cfg.rabc_progress_path}")
-        logging.info(f"Using chunk_size={chunk_size} from policy config, head_mode={head_mode}")
+        logging.info(
+            f"Using chunk_size={chunk_size} from policy config, head_mode={head_mode}"
+        )
         rabc_weights = RABCWeights(
             progress_path=cfg.rabc_progress_path,
             chunk_size=chunk_size,
@@ -320,13 +340,19 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     step = 0  # number of policy updates (forward + backward + optim)
 
     if cfg.resume:
-        step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
+        step, optimizer, lr_scheduler = load_training_state(
+            cfg.checkpoint_path, optimizer, lr_scheduler
+        )
 
-    num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
+    num_learnable_params = sum(
+        p.numel() for p in policy.parameters() if p.requires_grad
+    )
     num_total_params = sum(p.numel() for p in policy.parameters())
 
     if is_main_process:
-        logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
+        logging.info(
+            colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}"
+        )
         if cfg.env is not None:
             logging.info(f"{cfg.env.task=}")
             logging.info("Creating environment processors")
@@ -338,8 +364,12 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         logging.info(f"{dataset.num_episodes=}")
         num_processes = accelerator.num_processes
         effective_bs = cfg.batch_size * num_processes
-        logging.info(f"Effective batch size: {cfg.batch_size} x {num_processes} = {effective_bs}")
-        logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
+        logging.info(
+            f"Effective batch size: {cfg.batch_size} x {num_processes} = {effective_bs}"
+        )
+        logging.info(
+            f"{num_learnable_params=} ({format_big_number(num_learnable_params)})"
+        )
         logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
     # create dataloader for offline training
@@ -365,6 +395,12 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         pin_memory=device.type == "cuda",
         drop_last=False,
         prefetch_factor=2 if cfg.num_workers > 0 else None,
+        # Equivariant geometric augmentation: same random rotation + translation
+        # is applied to observation.image, observation.state, and action so
+        # the learning signal stays spatially consistent.
+        # Runs on CPU in worker processes before any device transfer.
+        # Set collate_fn=None to disable augmentation.
+        collate_fn=AugmentCollate(max_angle_deg=180.0, max_translate_coord=50.0),
     )
 
     # Prepare everything with accelerator
@@ -457,7 +493,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         if cfg.save_checkpoint and is_saving_step:
             if is_main_process:
                 logging.info(f"Checkpoint policy after step {step}")
-                checkpoint_dir = get_step_checkpoint_dir(cfg.output_dir, cfg.steps, step)
+                checkpoint_dir = get_step_checkpoint_dir(
+                    cfg.output_dir, cfg.steps, step
+                )
                 save_checkpoint(
                     checkpoint_dir=checkpoint_dir,
                     step=step,
@@ -519,7 +557,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
                 if wandb_logger:
                     wandb_log_dict = {**eval_tracker.to_dict(), **eval_info}
                     wandb_logger.log_dict(wandb_log_dict, step, mode="eval")
-                    wandb_logger.log_video(eval_info["overall"]["video_paths"][0], step, mode="eval")
+                    wandb_logger.log_video(
+                        eval_info["overall"]["video_paths"][0], step, mode="eval"
+                    )
 
             accelerator.wait_for_everyone()
 

@@ -12,8 +12,8 @@ MAX_STEPS_PER_EPISODE = 20
 
 
 def main():
-    device = torch.device("mps")  # or "cuda" or "cpu"
-    model_id = "<user>/robot_learning_tutorial_diffusion"
+    device = torch.device("cuda")  # or "cuda" or "cpu"
+    model_id = "outputs/robot_learning_tutorial/diffusion"
 
     model = DiffusionPolicy.from_pretrained(model_id)
 
@@ -38,7 +38,9 @@ def main():
         "up": OpenCVCameraConfig(index_or_path=1, width=640, height=480, fps=30),
     }
 
-    robot_cfg = SO100FollowerConfig(port=follower_port, id=follower_id, cameras=camera_config)
+    robot_cfg = SO100FollowerConfig(
+        port=follower_port, id=follower_id, cameras=camera_config
+    )
     robot = SO100Follower(robot_cfg)
     robot.connect()
 

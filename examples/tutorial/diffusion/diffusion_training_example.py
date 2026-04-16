@@ -25,7 +25,7 @@ def main():
     output_directory.mkdir(parents=True, exist_ok=True)
 
     # Select your device
-    device = torch.device("mps")  # or "cuda" or "cpu"
+    device = torch.device("cuda")  # or "cuda" or "cpu"
 
     dataset_id = "lerobot/svla_so101_pickplace"
 
@@ -33,19 +33,29 @@ def main():
     dataset_metadata = LeRobotDatasetMetadata(dataset_id)
     features = dataset_to_policy_features(dataset_metadata.features)
 
-    output_features = {key: ft for key, ft in features.items() if ft.type is FeatureType.ACTION}
-    input_features = {key: ft for key, ft in features.items() if key not in output_features}
+    output_features = {
+        key: ft for key, ft in features.items() if ft.type is FeatureType.ACTION
+    }
+    input_features = {
+        key: ft for key, ft in features.items() if key not in output_features
+    }
 
-    cfg = DiffusionConfig(input_features=input_features, output_features=output_features)
+    cfg = DiffusionConfig(
+        input_features=input_features, output_features=output_features
+    )
     policy = DiffusionPolicy(cfg)
-    preprocessor, postprocessor = make_pre_post_processors(cfg, dataset_stats=dataset_metadata.stats)
+    preprocessor, postprocessor = make_pre_post_processors(
+        cfg, dataset_stats=dataset_metadata.stats
+    )
 
     policy.train()
     policy.to(device)
 
     # To perform action chunking, ACT expects a given number of actions as targets
     delta_timestamps = {
-        "observation.state": make_delta_timestamps(cfg.observation_delta_indices, dataset_metadata.fps),
+        "observation.state": make_delta_timestamps(
+            cfg.observation_delta_indices, dataset_metadata.fps
+        ),
         "action": make_delta_timestamps(cfg.action_delta_indices, dataset_metadata.fps),
     }
 
@@ -60,7 +70,7 @@ def main():
 
     # Create the optimizer and dataloader for offline training
     optimizer = cfg.get_optimizer_preset().build(policy.parameters())
-    batch_size = 32
+    batch_size = 16
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
@@ -70,7 +80,7 @@ def main():
     )
 
     # Number of training steps and logging frequency
-    training_steps = 1
+    training_steps = 1000
     log_freq = 1
 
     # Run training loop
@@ -97,9 +107,9 @@ def main():
     postprocessor.save_pretrained(output_directory)
 
     # Save all assets to the Hub
-    policy.push_to_hub("<user>/robot_learning_tutorial_diffusion")
-    preprocessor.push_to_hub("<user>/robot_learning_tutorial_diffusion")
-    postprocessor.push_to_hub("<user>/robot_learning_tutorial_diffusion")
+    # policy.push_to_hub("<user>/robot_learning_tutorial_diffusion")
+    # preprocessor.push_to_hub("<user>/robot_learning_tutorial_diffusion")
+    # postprocessor.push_to_hub("<user>/robot_learning_tutorial_diffusion")
 
 
 if __name__ == "__main__":
