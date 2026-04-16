@@ -1,0 +1,13 @@
+lerobot-train \
+    --output_dir=outputs/train/diffusion_pusht_augmentation \
+    --policy.type=diffusion \
+    --env.type=pusht \
+    --dataset.repo_id=lerobot/pusht \
+    --seed=100000 \
+    --batch_size=128 \
+    --steps=500000 \
+    --policy.push_to_hub=false \
+    --eval_freq=12500 \
+    --save_freq=25000 \
+    --wandb.enable=true \
+    --policy.crop_shape="[84,84]" && /usr/bin/shutdown

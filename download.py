@@ -30,15 +30,15 @@ def download_from_hf(
 
 if __name__ == "__main__":
     # 例1：下载模型权重
-    download_from_hf(
-        repo_id="lerobot/diffusion_pusht",
-        repo_type="model",
-        local_dir="~/Documents/Diffusion/data/lerobot/diffusion_pusht",
-    )
+    # download_from_hf(
+    #     repo_id="lerobot/diffusion_pusht",
+    #     repo_type="model",
+    #     local_dir="~/Documents/Diffusion/data/lerobot/diffusion_pusht",
+    # )
 
     # 例2：下载数据集
-    # download_from_hf(
-    #     repo_id="lerobot/pusht",
-    #     repo_type="dataset",
-    #     local_dir="~/hf_downloads/pusht_dataset",
-    # )
+    download_from_hf(
+        repo_id="lerobot/pusht",
+        repo_type="dataset",
+        local_dir="~/hf_downloads/pusht_dataset",
+    )

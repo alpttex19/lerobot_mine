@@ -73,7 +73,6 @@ class TrainPipelineConfig(HubMixin):
     # RA-BC (Reward-Aligned Behavior Cloning) parameters
     use_rabc: bool = False  # Enable reward-weighted training
     use_augmentation: bool = True  # 控制 AugmentCollate
-    use_random_goal: bool = False  # 控制 RandomGoalWrapper（仅 PushT）
     rabc_progress_path: str | None = (
         None  # Path to precomputed SARM progress parquet file
     )

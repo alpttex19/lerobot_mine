@@ -775,7 +775,7 @@ def eval_policy_all(
                 _accumulate_to(tg, metrics)
                 per_task_infos.append({"task_group": tg, "task_id": tid, "metrics": metrics})
             finally:
-                env.close()
+                # env.close()
                 # Prefetch next task's workers *after* closing current env to prevent
                 # GPU memory overlap between consecutive tasks.
                 if i + 1 < len(tasks):

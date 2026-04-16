@@ -13,6 +13,8 @@ class RandomGoalWrapper(gym.Wrapper):
     samples a random goal from the seeded RNG after each reset, enabling
     evaluation on a broader distribution of goals.
     """
+    task_description: str = "Push the T-shaped block to the target pose."  
+    task: str = "pusht"  
 
     def reset(self, seed=None, options=None):
         obs, info = self.env.reset(seed=seed, options=options)

@@ -15,7 +15,7 @@ python visualize_dataset_html.py --repo-id lerobot/pusht
 
 ```bash
 lerobot-train \
-    --output_dir=outputs/train/diffusion_pusht_v3 \
+    --output_dir=outputs/train/diffusion_pusht_augmentation \
     --policy.type=diffusion \
     --env.type=pusht \
     --dataset.repo_id=lerobot/pusht \
@@ -26,5 +26,8 @@ lerobot-train \
     --eval_freq=25000 \
     --save_freq=25000 \
     --wandb.enable=true \
-    --policy.crop_shape="[84,84]"
+    --policy.crop_shape="[84,84]" \
+    --env.random_goal=true \
+    --use_augmentation=true 
+    && /usr/bin/shutdown
 ```

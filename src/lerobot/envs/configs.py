@@ -23,6 +23,8 @@ import draccus
 import gymnasium as gym
 from gymnasium.envs.registration import registry as gym_registry
 
+from lerobot.envs.wrappers import RandomGoalWrapper
+
 from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.processor import (
     IsaaclabArenaProcessorStep,
@@ -30,7 +32,6 @@ from lerobot.processor import (
     PolicyProcessorPipeline,
 )
 from lerobot.robots import RobotConfig
-from lerobot.envs.wrappers import RandomGoalWrapper
 from lerobot.teleoperators.config import TeleoperatorConfig
 from lerobot.utils.constants import (
     ACTION,
@@ -119,15 +120,14 @@ class EnvConfig(draccus.ChoiceRegistry, abc.ABC):
                 )
 
         def _make_one():
+            import importlib                                                                                                                              
+            importlib.import_module(self.package_name)  # ensure gym namespace is registered in subprocess
             env = gym.make(
                 self.gym_id,
                 disable_env_checker=self.disable_env_checker,
                 **self.gym_kwargs,
             )
-            if self.random_goal:
-                from examples.training.eval_policy import RandomGoalWrapper
-
-                env = RandomGoalWrapper(env)
+            env = RandomGoalWrapper(env)
             return env
 
         extra_kwargs: dict = {}
