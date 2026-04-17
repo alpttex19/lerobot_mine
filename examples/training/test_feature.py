@@ -19,9 +19,9 @@ class RandomGoalWrapper(gym.Wrapper):
         # 注意：为了验证模型是否真的能提取位姿，必须让环境有多样性
         # 这里解除你之前的注释，让目标随机化，逼迫模型去"看"
         rng = self.env.unwrapped.np_random
-        x = float(rng.integers(100, 412))
-        y = float(rng.integers(100, 412))
-        theta = float(rng.uniform(0, 2 * np.pi))
+        x = float(rng.integers(206, 306))
+        y = float(rng.integers(206, 306))
+        theta = float(rng.uniform(-np.pi, np.pi))
         self.env.unwrapped.goal_pose = np.array([x, y, theta], dtype=np.float64)
         info["goal_pose"] = self.env.unwrapped.goal_pose
         return obs, info

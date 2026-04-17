@@ -147,7 +147,7 @@ class DiffusionPolicy(PreTrainedPolicy):
         action = self._queues[ACTION].popleft()
         return action
 
-    def forward(self, batch: dict[str, Tensor]) -> tuple[Tensor, None]:
+    def forward(self, batch: dict[str, Tensor]) -> tuple[Tensor, dict | None]:
         """Run the batch through the model and compute the loss for training or validation."""
         if self.config.image_features:
             batch = dict(batch)  # shallow copy so that adding a key doesn't modify the original
@@ -155,9 +155,23 @@ class DiffusionPolicy(PreTrainedPolicy):
                 if self.config.n_obs_steps == 1 and batch[key].ndim == 4:
                     batch[key] = batch[key].unsqueeze(1)
             batch[OBS_IMAGES] = torch.stack([batch[key] for key in self.config.image_features], dim=-4)
-        loss = self.diffusion.compute_loss(batch)
-        # no output_dict so returning None
-        return loss, None
+            # Normalize goal image to match the scale of the already-normalized obs
+            # images, so goal_encoder and rgb_encoder receive inputs on the same scale.
+            # We z-score the goal image per channel using batch statistics, then
+            # rescale to match the obs image's batch statistics.
+            first_img_key = next(iter(self.config.image_features))
+            goal_key = f"goal.{first_img_key}"
+            if goal_key in batch:
+                obs_ref = batch[OBS_IMAGES][:, -1, 0]  # (B, C, H, W) normalized
+                goal_img = batch[goal_key]              # (B, C, H, W) unnormalized
+                o_mean = obs_ref.mean(dim=(0, 2, 3), keepdim=True)
+                o_std = obs_ref.std(dim=(0, 2, 3), keepdim=True).clamp(min=1e-5)
+                g_mean = goal_img.mean(dim=(0, 2, 3), keepdim=True)
+                g_std = goal_img.std(dim=(0, 2, 3), keepdim=True).clamp(min=1e-5)
+                batch[goal_key] = (goal_img - g_mean) / g_std * o_std + o_mean
+        loss, aux_loss_val = self.diffusion.compute_loss(batch)
+        output_dict = {"goal_aux_loss": aux_loss_val} if aux_loss_val > 0 else None
+        return loss, output_dict
 
 
 def _make_noise_scheduler(name: str, **kwargs: dict):
@@ -188,9 +202,14 @@ class DiffusionModel(nn.Module):
                 encoders = [DiffusionRgbEncoder(config) for _ in range(num_images)]
                 self.rgb_encoder = nn.ModuleList(encoders)
                 global_cond_dim += encoders[0].feature_dim * num_images
+                _enc_feat_dim = encoders[0].feature_dim
             else:
                 self.rgb_encoder = DiffusionRgbEncoder(config)
                 global_cond_dim += self.rgb_encoder.feature_dim * num_images
+                _enc_feat_dim = self.rgb_encoder.feature_dim
+            # Goal conditioning auxiliary branch (training only — not used at inference)
+            self.goal_encoder = DiffusionRgbEncoder(config)
+            self.goal_pred_head = nn.Linear(_enc_feat_dim, self.goal_encoder.feature_dim)
         if self.config.env_state_feature:
             global_cond_dim += self.config.env_state_feature.shape[0]
 
@@ -382,7 +401,29 @@ class DiffusionModel(nn.Module):
             in_episode_bound = ~batch["action_is_pad"]
             loss = loss * in_episode_bound.unsqueeze(-1)
 
-        return loss.mean()
+        loss = loss.mean()
+
+        # Auxiliary goal prediction loss (training only).
+        # Requires "goal.<cam>" keys in batch, added by DatasetReader at load time.
+        # At inference the key is absent, so this block is skipped entirely.
+        aux_loss_val = 0.0
+        if hasattr(self, "goal_encoder") and self.config.image_features:
+            goal_key = "goal." + next(iter(self.config.image_features))
+            if goal_key in batch:
+                goal_img = batch[goal_key]  # (B, C, H, W)
+                goal_feat = self.goal_encoder(goal_img)  # (B, feat_dim)
+                # Most-recent obs step image as the prediction source
+                curr_img = batch[OBS_IMAGES][:, -1, 0]  # (B, C, H, W)
+                if self.config.use_separate_rgb_encoder_per_camera:
+                    curr_feat = self.rgb_encoder[0](curr_img)
+                else:
+                    curr_feat = self.rgb_encoder(curr_img)
+                pred_goal = self.goal_pred_head(curr_feat)
+                aux_loss = F.mse_loss(pred_goal, goal_feat)
+                loss = loss + 0.1 * aux_loss
+                aux_loss_val = aux_loss.item()
+
+        return loss, aux_loss_val
 
 
 class SpatialSoftmax(nn.Module):

@@ -276,6 +276,24 @@ class DatasetReader:
             for cam in image_keys:
                 item[cam] = self._image_transforms(item[cam])
 
+        # Goal image: last frame of this episode (training-time goal conditioning only)
+        if len(self._meta.camera_keys) > 0:
+            goal_abs_idx = int(self._meta.episodes[ep_idx]["dataset_to_index"]) - 1
+            goal_rel_idx = (
+                self._absolute_to_relative_idx[goal_abs_idx]
+                if self._absolute_to_relative_idx is not None
+                else goal_abs_idx
+            )
+            goal_ts = self.hf_dataset[goal_rel_idx]["timestamp"].item()
+            video_cam_keys = [k for k in self._meta.camera_keys if k in self._meta.video_keys]
+            if video_cam_keys:
+                goal_frames = self._query_videos({k: [goal_ts] for k in video_cam_keys}, ep_idx)
+                for cam in video_cam_keys:
+                    goal_img = goal_frames[cam]
+                    if self._image_transforms is not None:
+                        goal_img = self._image_transforms(goal_img)
+                    item[f"goal.{cam}"] = goal_img
+
         # Add task as a string
         task_idx = item["task_index"].item()
         item["task"] = self._meta.tasks.iloc[task_idx].name

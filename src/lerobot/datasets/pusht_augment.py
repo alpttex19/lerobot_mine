@@ -284,6 +284,25 @@ def apply_equivariant_aug(
             imgs_aug[b, t] = TF.center_crop(augmented, [H, W])
     batch["observation.image"] = imgs_aug
 
+    # ── Augment goal images (B, C, H, W) with the same per-sample transform ──
+    for key in list(batch.keys()):
+        if key.startswith("goal.") and isinstance(batch[key], torch.Tensor) and batch[key].ndim == 4:
+            goal_imgs = batch[key]
+            goal_imgs_aug = torch.empty_like(goal_imgs)
+            for b in range(B):
+                padded = TF.pad(goal_imgs[b], padding=pad, fill=1.0)
+                augmented = TF.affine(
+                    padded,
+                    angle=angles[b].item(),
+                    translate=[tx_px[b], ty_px[b]],
+                    scale=1.0,
+                    shear=0,
+                    interpolation=TF.InterpolationMode.BILINEAR,
+                    fill=1.0,
+                )
+                goal_imgs_aug[b] = TF.center_crop(augmented, [H, W])
+            batch[key] = goal_imgs_aug
+
     # ── Augment coordinates (vectorized) ─────────────────────────────────────
     dev = batch["observation.state"].device
     theta = angles * (math.pi / 180.0)

@@ -1,5 +1,5 @@
 lerobot-train \
-    --output_dir=outputs/train/diffusion_pusht_augmentation \
+    --output_dir=outputs/train/diffusion_pusht_augmented_goal_image \
     --policy.type=diffusion \
     --env.type=pusht \
     --dataset.repo_id=lerobot/pusht \
