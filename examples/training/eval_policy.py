@@ -46,11 +46,7 @@ from lerobot.policies.diffusion.modeling_diffusion import DiffusionPolicy
 from lerobot.policies.factory import make_pre_post_processors
 
 
-def main():
-    # Path to the saved policy checkpoint (output of train_policy.py).
-    pretrained_path = Path(
-        "outputs/train/diffusion_pusht_augmented/checkpoints/440000/pretrained_model"
-    )
+def main(pretrained_path, video_dir):
 
     # Select your device.
     device = torch.device("cuda")
@@ -77,8 +73,6 @@ def main():
         },
     )
 
-    # Directory to save evaluation videos.
-    video_dir = Path("outputs/eval/diffusion_pusht_v4/videos")
     video_dir.mkdir(parents=True, exist_ok=True)
 
     # Create the PushT gym environment.
@@ -167,4 +161,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Path to the saved policy checkpoint (output of train_policy.py).
+    pretrained_path = Path(
+        "outputs/train/diffusion_pusht_augmented_goal_image/checkpoints/500000/pretrained_model"
+    )
+    # Directory to save evaluation videos.
+    video_dir = Path("outputs/eval/diffusion_pusht_augmented_goal_image/videos")
+    main(pretrained_path, video_dir)
